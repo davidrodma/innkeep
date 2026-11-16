@@ -1,0 +1,46 @@
+{{- /*
+Migrações de banco ANTES do deploy (hook pre-install/pre-upgrade do Helm).
+
+Se uma migração falhar, o deploy inteiro é abortado e a versão antiga segue no
+ar. Regra que torna isso seguro: migrações sempre COMPATÍVEIS com a versão
+anterior do código (adicionar coluna nula, nova tabela...). Remoções acontecem
+em um deploy posterior ("expand / contract").
+*/ -}}
+{{- range $name, $svc := .Values.services }}
+{{- if $svc.migrate }}
+{{- $ctx := dict "root" $ "name" $name }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "innkeep.fullname" $ctx }}-migrate
+  labels: {{- include "innkeep.labels" $ctx | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels: {{- include "innkeep.labels" $ctx | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      # Sem serviceAccountName: no primeiro install os hooks rodam ANTES dos
+      # recursos normais do chart (a ServiceAccount ainda não existe). A
+      # migração não precisa de permissões na AWS, então usa a conta padrão.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: migrate
+          image: {{ include "innkeep.image" $ctx }}
+          args: ["migrate"]
+          env:
+            {{- include "innkeep.commonEnv" $ctx | nindent 12 }}
+            {{- include "innkeep.secretEnv" (dict "root" $ "keys" ($svc.secretEnv | default list)) | nindent 12 }}
+          securityContext: {{- include "innkeep.containerSecurity" $ctx | nindent 12 }}
+{{- end }}
+{{- end }}

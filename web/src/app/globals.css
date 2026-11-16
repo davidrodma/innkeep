@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* Tema do InnKeep. No Tailwind 4 o tema é declarado em CSS: cada variável
+   abaixo vira classes utilitárias (bg-brand-600, text-ink-900, ...). */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Marca: verde-azulado. */
+  --color-brand-50: #effaf7;
+  --color-brand-100: #d7f3ec;
+  --color-brand-200: #afe6d9;
+  --color-brand-300: #7dd2c2;
+  --color-brand-400: #48b6a5;
+  --color-brand-500: #2a9a8a;
+  --color-brand-600: #1d7c70;
+  --color-brand-700: #1a635b;
+  --color-brand-800: #194f4a;
+  --color-brand-900: #18423e;
+
+  /* Neutros levemente quentes para texto, bordas e fundos. */
+  --color-ink-50: #f8f8f6;
+  --color-ink-100: #f0f0ec;
+  --color-ink-200: #e2e2dc;
+  --color-ink-300: #cbcbc3;
+  --color-ink-400: #a3a39a;
+  --color-ink-500: #7c7c73;
+  --color-ink-600: #5e5e57;
+  --color-ink-700: #454540;
+  --color-ink-800: #2c2c29;
+  --color-ink-900: #1a1a18;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-ink-50);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Foco sempre visível para quem navega pelo teclado. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+
+  /* Números alinhados em colunas de valores. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

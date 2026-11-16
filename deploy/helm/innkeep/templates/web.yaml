@@ -1,0 +1,60 @@
+{{- $ctx := dict "root" $ "name" "web" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "innkeep.fullname" $ctx }}
+  labels: {{- include "innkeep.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels: {{- include "innkeep.selector" $ctx | nindent 6 }}
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: {{- include "innkeep.labels" $ctx | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000 # usuário "node" da imagem oficial
+      containers:
+        - name: web
+          image: {{ include "innkeep.image" $ctx }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+          env:
+            # O servidor do Next.js chama o gateway pela rede interna do cluster.
+            - name: API_URL
+              value: {{ printf "http://%s-gateway:8080" .Release.Name | quote }}
+            - name: PUBLIC_WEB_URL
+              value: {{ .Values.global.publicWebUrl | quote }}
+          readinessProbe:
+            httpGet: { path: /login, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /login, port: http }
+            periodSeconds: 20
+          resources: {{- toYaml .Values.web.resources | nindent 12 }}
+          securityContext: {{- include "innkeep.containerSecurity" $ctx | nindent 12 }}
+          # O Next.js precisa de um diretório gravável para o cache de imagens.
+          volumeMounts:
+            - name: next-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "innkeep.fullname" $ctx }}
+  labels: {{- include "innkeep.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "innkeep.selector" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

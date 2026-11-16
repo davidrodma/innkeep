@@ -1,0 +1,13 @@
+# Produção. Os endereços reais (domínios, brokers do MSK, ARN do certificado)
+# são definidos aqui por quem opera a instalação — nunca segredos.
+global:
+  environment: production
+  kafka:
+    brokers: "" # saída do Terraform: msk_bootstrap_brokers_sasl_scram
+
+defaults:
+  replicas: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8

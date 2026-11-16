@@ -1,0 +1,47 @@
+# Segredos e configuração local — NUNCA versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Go
+/bin/
+*.test
+*.out
+coverage.*
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Testes
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Helm
+deploy/helm/**/charts/*.tgz
+
+# Editores e sistema
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Claude Code: preferências locais de cada pessoa
+.claude/settings.local.json

@@ -1,0 +1,10 @@
+# Configuração do estado remoto do Terraform (copie para backend-production.hcl).
+# Crie o bucket uma única vez, com versionamento ligado:
+#   aws s3api create-bucket --bucket <nome> --region sa-east-1 \
+#     --create-bucket-configuration LocationConstraint=sa-east-1
+#   aws s3api put-bucket-versioning --bucket <nome> --versioning-configuration Status=Enabled
+bucket       = "innkeep-terraform-state-<sua-conta>"
+key          = "production/terraform.tfstate"
+region       = "sa-east-1"
+encrypt      = true
+use_lockfile = true

@@ -1,0 +1,22 @@
+# Staging: espelho reduzido de produção, para validar cada versão antes.
+global:
+  environment: staging
+  logLevel: debug
+  publicWebUrl: https://reservas.staging.example.com
+  publicApiUrl: https://api.staging.example.com
+
+secrets:
+  externalSecret:
+    remoteKey: innkeep/staging
+
+defaults:
+  replicas: 1
+  autoscaling:
+    enabled: false
+
+web:
+  replicas: 1
+
+ingress:
+  webHost: reservas.staging.example.com
+  apiHost: api.staging.example.com

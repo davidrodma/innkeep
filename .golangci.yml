@@ -1,0 +1,37 @@
+# Configuração do golangci-lint (v2): um "linter de linters" para Go.
+# Começa enxuto — dá para ligar mais regras conforme o projeto amadurece.
+version: "2"
+
+run:
+  build-tags: [integration, e2e]
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose # corpo de resposta HTTP sempre fechado
+    - errorlint # comparação de erros com errors.Is / errors.As
+    - gosec # padrões inseguros (SQL concatenado, permissões de arquivo...)
+    # O "misspell" ficou de fora de propósito: ele só conhece inglês e acusaria
+    # cada palavra em português dos comentários ("Comando", "devolvendo"...).
+    - nilerr # erro verificado e depois descartado
+    - noctx # requisições HTTP sem context
+    - rowserrcheck # rows.Err() verificado após o laço
+    - sqlclosecheck # rows/statements sempre fechados
+    - unconvert
+  settings:
+    gosec:
+      # Exceções pontuais ficam na própria linha, com o motivo:
+      # `//nolint:gosec // G704: ...`. Assim um caso novo continua barrando o PR.
+      excludes:
+        - G115 # conversões de inteiro verificadas manualmente (limites conhecidos)
+  exclusions:
+    # As mesmas exceções que o golangci-lint v1 aplicava sozinho: não exige
+    # tratar o erro de Close/Flush/Print (ex.: `defer resp.Body.Close()`).
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters: [gosec, noctx]
+
+formatters:
+  enable: [gofmt]

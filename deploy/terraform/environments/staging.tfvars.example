@@ -1,0 +1,12 @@
+# Staging: a mesma arquitetura de produção, com máquinas menores e sem
+# redundância (mais barato).
+environment         = "staging"
+region              = "sa-east-1"
+vpc_cidr            = "10.41.0.0/16"
+node_instance_types = ["t4g.medium"]
+node_min_size       = 1
+node_max_size       = 3
+db_instance_class   = "db.t4g.micro"
+kafka_instance_type = "kafka.t3.small"
+redis_node_type     = "cache.t4g.micro"
+github_repository   = "davidrodma/innkeep"

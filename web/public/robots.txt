@@ -1,0 +1,5 @@
+# O site público de reservas pode ser indexado; o painel e as reservas, não.
+User-agent: *
+Disallow: /admin
+Disallow: /booking
+Disallow: /login

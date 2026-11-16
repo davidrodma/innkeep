@@ -1,0 +1,23 @@
+# Dependabot abre pull requests atualizando dependências — inclusive as que
+# corrigem vulnerabilidades. Cada PR passa pelo CI antes de ser aceito.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      go-dependencies: { patterns: ["*"] }
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: weekly }
+    groups:
+      npm-dependencies: { patterns: ["*"] }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker
+    directories: ["/deploy/docker", "/web"]
+    schedule: { interval: weekly }

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: innkeep
+description: InnKeep — sistema de gestão hoteleira em microserviços (todos os serviços e o front-end).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords: [hotel, pms, microservices, kafka]
+sources:
+  - https://github.com/davidrodma/innkeep

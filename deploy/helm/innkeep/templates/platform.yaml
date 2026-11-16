@@ -1,0 +1,113 @@
+{{- /* Recursos compartilhados: ServiceAccount, Secret externo, Ingress e NetworkPolicy. */ -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- if .Values.secrets.externalSecret.enabled }}
+---
+# O External Secrets Operator lê o segredo no AWS Secrets Manager e o mantém
+# sincronizado em um Secret do Kubernetes. Nenhum segredo passa pelo Git nem
+# pelo pipeline de CI/CD.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.secrets.name }}
+  # Criado ANTES do Job de migração (peso menor = roda primeiro), que já
+  # precisa das URLs dos bancos.
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  refreshInterval: {{ .Values.secrets.externalSecret.refreshInterval }}
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ .Values.secrets.externalSecret.secretStore }}
+  target:
+    name: {{ .Values.secrets.name }}
+    # "Orphan": o Secret não pertence ao ExternalSecret. Como o hook recria o
+    # ExternalSecret a cada deploy, isso evita que o Secret seja apagado (e os
+    # pods novos fiquem sem variáveis) durante a recriação.
+    creationPolicy: Orphan
+  dataFrom:
+    - extract:
+        key: {{ .Values.secrets.externalSecret.remoteKey }}
+{{- end }}
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  annotations: {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    # Site e painel (Next.js).
+    - host: {{ .Values.ingress.webHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-web
+                port: { number: 80 }
+    # API pública: só o gateway fica exposto; os demais serviços são internos.
+    - host: {{ .Values.ingress.apiHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-gateway
+                port: { number: 8080 }
+{{- end }}
+{{- if .Values.networkPolicy.enabled }}
+---
+# Rede "negar por padrão": um pod só recebe conexões de quem precisa falar com
+# ele. Se um serviço for comprometido, ele não alcança os demais livremente.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# Gateway e web aceitam tráfego externo (vindo do ALB).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-edge
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [gateway, web]
+  ingress:
+    - {}
+---
+# Os serviços internos aceitam conexões apenas de pods do próprio InnKeep
+# (gateway, web e serviços que buscam o JWKS do identity).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-internal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: innkeep
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: innkeep
+      ports:
+        - port: 8080
+{{- end }}

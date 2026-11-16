@@ -1,0 +1,50 @@
+# Configuração do OpenTelemetry Collector (desenvolvimento local).
+#
+# O Collector é um "roteador" de telemetria. Um pipeline tem três estágios:
+#
+#   receivers  -> por onde os dados ENTRAM  (os serviços enviam em OTLP)
+#   processors -> o que se faz no caminho   (agrupar em lotes, limitar memória)
+#   exporters  -> para onde os dados VÃO    (Jaeger, Prometheus, X-Ray...)
+#
+# Os serviços só conhecem o endereço do Collector. Trocar de ferramenta de
+# observabilidade é editar este arquivo — nenhum serviço é recompilado.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  # Protege o próprio Collector contra estouro de memória.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  # Envia em lotes em vez de um a um (menos chamadas de rede).
+  batch:
+    timeout: 2s
+
+exporters:
+  # Traces -> Jaeger (que também fala OTLP).
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  # Métricas -> expostas em :8889 para o Prometheus vir buscar ("scrape").
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

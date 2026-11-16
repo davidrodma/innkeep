@@ -1,0 +1,22 @@
+# Configuração do gitleaks, o scanner de segredos do job "Segurança" do CI.
+#
+# Usa todas as regras padrão. A única coisa acrescentada é ignorar pastas
+# GERADAS localmente (dependências, build, estado do Terraform): elas nunca vão
+# para o Git, mas atrapalham quando o scanner roda numa pasta de trabalho
+# (`gitleaks dir`). No CI, que examina o histórico do Git, nada muda.
+#
+# Exceções a segredos de verdade NÃO entram aqui: uma chave pública de
+# propósito (como a de desenvolvimento do fieldcrypt) é marcada na própria
+# linha com o comentário `gitleaks:allow`, junto com a explicação.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Pastas geradas localmente, que não vão para o Git"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)\.next/''',
+  '''(^|/)\.terraform/''',
+  '''(^|/)(test-results|playwright-report|blob-report)/''',
+]

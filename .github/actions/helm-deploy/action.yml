@@ -1,0 +1,39 @@
+# Action composta reutilizada pelos deploys de staging e produção: o mesmo
+# procedimento, só muda o arquivo de valores do ambiente.
+name: Helm deploy
+description: Aplica o chart do InnKeep no EKS
+
+inputs:
+  environment: { description: "staging ou production", required: true }
+  tag: { description: "Tag (SHA) das imagens", required: true }
+  registry: { description: "Endereço do ECR", required: true }
+  role-arn: { description: "IAM Role assumido via OIDC", required: true }
+  region: { description: "Região AWS", required: true }
+  cluster: { description: "Nome do cluster EKS", required: true }
+
+runs:
+  using: composite
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.role-arn }}
+        aws-region: ${{ inputs.region }}
+
+    - uses: azure/setup-helm@v4
+
+    - name: Kubeconfig do cluster
+      shell: bash
+      run: aws eks update-kubeconfig --name "${{ inputs.cluster }}" --region "${{ inputs.region }}"
+
+    - name: helm upgrade
+      shell: bash
+      # --atomic: se os pods novos não ficarem saudáveis, o Helm desfaz o
+      # deploy sozinho (rollback automático). As migrações rodam antes, em um
+      # Job do tipo "hook" (veja templates/migrations-job.yaml).
+      run: |
+        helm upgrade --install innkeep deploy/helm/innkeep \
+          --namespace "innkeep-${{ inputs.environment }}" --create-namespace \
+          -f "deploy/helm/innkeep/values-${{ inputs.environment }}.yaml" \
+          --set global.image.registry="${{ inputs.registry }}/innkeep" \
+          --set global.image.tag="${{ inputs.tag }}" \
+          --atomic --timeout 15m --wait

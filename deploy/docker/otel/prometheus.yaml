@@ -1,0 +1,10 @@
+# O Prometheus funciona por "pull": de tempos em tempos ele vai buscar as
+# métricas nos alvos configurados. Aqui o único alvo é o OpenTelemetry
+# Collector, que reúne as métricas de todos os serviços.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8889"]

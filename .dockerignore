@@ -1,0 +1,16 @@
+# Mantém o contexto de build pequeno e sem segredos.
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+**/node_modules
+**/.next
+**/coverage
+**/test-results
+**/playwright-report
+docs
+deploy/helm
+deploy/terraform
+*.md

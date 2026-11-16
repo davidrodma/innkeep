@@ -1,0 +1,136 @@
+# =============================================================================
+# Valores padrão do chart. Cada ambiente sobrescreve o que precisa em
+# values-staging.yaml / values-production.yaml.
+#
+# SEGREDOS NÃO FICAM AQUI. Senhas e chaves vêm de um Secret do Kubernetes
+# sincronizado a partir do AWS Secrets Manager pelo External Secrets Operator
+# (veja templates/external-secret.yaml). Este arquivo é público, no GitHub.
+# =============================================================================
+
+global:
+  image:
+    registry: ""      # ex.: 123456789012.dkr.ecr.sa-east-1.amazonaws.com/innkeep
+    tag: ""           # SHA do commit, definido pelo pipeline
+    pullPolicy: IfNotPresent
+  environment: production
+  logLevel: info
+  timezone: America/Sao_Paulo
+  # Endereços públicos (links em e-mails e calendários iCal).
+  publicWebUrl: https://reservas.example.com
+  publicApiUrl: https://api.example.com
+  # OpenTelemetry Collector (instalado no cluster, ex.: AWS Distro for OpenTelemetry).
+  otlpEndpoint: http://otel-collector.observability:4318
+  kafka:
+    brokers: ""        # endpoints SASL/SCRAM do Amazon MSK (porta 9096)
+    tls: true
+    saslMechanism: SCRAM-SHA-512
+    # Em produção os tópicos são criados pelo Terraform/operador, com
+    # replicação 3 — os serviços não criam tópicos sozinhos.
+    ensureTopics: false
+  auth:
+    issuer: innkeep-identity
+
+# Secret com as variáveis sensíveis (criado pelo ExternalSecret abaixo).
+secrets:
+  name: innkeep-secrets
+  externalSecret:
+    enabled: true
+    secretStore: aws-secrets-manager   # ClusterSecretStore configurado no cluster
+    remoteKey: innkeep/production      # nome do segredo no AWS Secrets Manager
+    refreshInterval: 1h
+
+serviceAccount:
+  # IRSA / Pod Identity: o pod recebe permissões AWS via IAM Role, sem chaves.
+  annotations: {}
+
+# Padrões aplicados a todos os serviços Go.
+defaults:
+  replicas: 2
+  port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+# Um bloco por microserviço. `secretEnv` lista as chaves do Secret que o
+# serviço recebe — cada serviço só enxerga os segredos de que precisa.
+services:
+  gateway:
+    expose: true
+    env:
+      IDENTITY_URL: http://innkeep-identity:8080
+      PROPERTY_URL: http://innkeep-property:8080
+      INVENTORY_URL: http://innkeep-inventory:8080
+      RESERVATION_URL: http://innkeep-reservation:8080
+      GUEST_URL: http://innkeep-guest:8080
+      BILLING_URL: http://innkeep-billing:8080
+      CHANNEL_URL: http://innkeep-channel:8080
+      TRUSTED_PROXIES: "1" # o ALB na frente do gateway
+    secretEnv: [REDIS_URL]
+  identity:
+    migrate: true
+    secretEnv: [DATABASE_URL_IDENTITY, REDIS_URL, JWT_PRIVATE_KEY, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD]
+  property:
+    migrate: true
+    kafka: true
+    secretEnv: [DATABASE_URL_PROPERTY, KAFKA_USERNAME, KAFKA_PASSWORD]
+  inventory:
+    migrate: true
+    kafka: true
+    secretEnv: [DATABASE_URL_INVENTORY, REDIS_URL, KAFKA_USERNAME, KAFKA_PASSWORD]
+  reservation:
+    migrate: true
+    kafka: true
+    secretEnv: [DATABASE_URL_RESERVATION, REDIS_URL, KAFKA_USERNAME, KAFKA_PASSWORD]
+  billing:
+    migrate: true
+    kafka: true
+    secretEnv: [DATABASE_URL_BILLING, REDIS_URL, KAFKA_USERNAME, KAFKA_PASSWORD]
+  guest:
+    migrate: true
+    kafka: true
+    secretEnv: [DATABASE_URL_GUEST, PII_ENCRYPTION_KEY, KAFKA_USERNAME, KAFKA_PASSWORD]
+  channel:
+    migrate: true
+    kafka: true
+    env:
+      CHANNEL_API_PULL_INTERVAL: 60s
+      CHANNEL_ICAL_PULL_INTERVAL: 15m
+    secretEnv: [DATABASE_URL_CHANNEL, CHANNEL_ENCRYPTION_KEY, KAFKA_USERNAME, KAFKA_PASSWORD]
+  notification:
+    kafka: true
+    env:
+      SMTP_HOST: email-smtp.sa-east-1.amazonaws.com # Amazon SES
+      SMTP_PORT: "587"
+      SMTP_TLS: starttls
+      MAIL_FROM: "InnKeep <reservas@example.com>"
+    secretEnv: [REDIS_URL, SMTP_USERNAME, SMTP_PASSWORD, KAFKA_USERNAME, KAFKA_PASSWORD]
+
+web:
+  replicas: 2
+  port: 3000
+  resources:
+    requests: { cpu: 100m, memory: 192Mi }
+    limits: { memory: 512Mi }
+
+# Entrada externa pelo AWS Load Balancer Controller (ALB) com TLS do ACM.
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...
+    # alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:...
+  webHost: reservas.example.com
+  apiHost: api.example.com
+
+networkPolicy:
+  enabled: true

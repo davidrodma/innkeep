@@ -1,0 +1,127 @@
+# =============================================================================
+# CD — Entrega Contínua para a AWS (EKS)
+#
+#   push na main ──► imagens no ECR ──► deploy em STAGING (automático)
+#                                   └─► deploy em PRODUÇÃO (exige aprovação)
+#
+# Autenticação na AWS por OIDC: o GitHub emite um token de curta duração e a
+# AWS o troca por credenciais temporárias de um IAM Role. NÃO existe chave de
+# acesso (AWS_ACCESS_KEY_ID) guardada no GitHub — nada para vazar.
+#
+# Pré-requisitos (veja docs/guides/deploy-producao.md):
+#   - Terraform aplicado (deploy/terraform), que cria o ECR, o EKS e o Role;
+#   - variáveis do repositório: AWS_REGION, AWS_ACCOUNT_ID, EKS_CLUSTER_NAME,
+#     AWS_DEPLOY_ROLE_ARN;
+#   - environments "staging" e "production" no GitHub, este último com
+#     "required reviewers" (aprovação manual antes de produção).
+# =============================================================================
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # necessário para o OIDC com a AWS
+
+concurrency:
+  group: release
+  cancel-in-progress: false # nunca interromper um deploy no meio
+
+env:
+  REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+  # A tag da imagem é o SHA do commit: imutável e rastreável até o código.
+  TAG: ${{ github.sha }}
+
+jobs:
+  images:
+    name: Imagens (${{ matrix.name }})
+    # Sem a AWS configurada (variável AWS_DEPLOY_ROLE_ARN vazia, como logo depois
+    # do primeiro push ou num fork), o release é PULADO em vez de falhar. Os jobs
+    # de deploy dependem deste e são pulados junto.
+    if: ${{ vars.AWS_DEPLOY_ROLE_ARN != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: gateway, target: services/gateway/cmd/gateway }
+          - { name: identity, target: services/identity/cmd/identity }
+          - { name: property, target: services/property/cmd/property }
+          - { name: inventory, target: services/inventory/cmd/inventory }
+          - { name: reservation, target: services/reservation/cmd/reservation }
+          - { name: billing, target: services/billing/cmd/billing }
+          - { name: guest, target: services/guest/cmd/guest }
+          - { name: channel, target: services/channel/cmd/channel }
+          - { name: notification, target: services/notification/cmd/notification }
+          - { name: web, target: "" }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build e push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.name == 'web' && 'web' || '.' }}
+          file: ${{ matrix.name == 'web' && 'web/Dockerfile' || 'deploy/docker/go-service.Dockerfile' }}
+          build-args: |
+            TARGET=${{ matrix.target }}
+            VERSION=${{ env.TAG }}
+          push: true
+          tags: ${{ env.REGISTRY }}/innkeep/${{ matrix.name }}:${{ env.TAG }}
+          # SBOM e proveniência: a "lista de ingredientes" assinada da imagem.
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Varredura de vulnerabilidades da imagem (Trivy)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.REGISTRY }}/innkeep/${{ matrix.name }}:${{ env.TAG }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  deploy-staging:
+    name: Deploy — staging
+    needs: images
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/helm-deploy
+        with:
+          environment: staging
+          tag: ${{ env.TAG }}
+          registry: ${{ env.REGISTRY }}
+          role-arn: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          region: ${{ vars.AWS_REGION }}
+          cluster: ${{ vars.EKS_CLUSTER_NAME }}
+
+  deploy-production:
+    name: Deploy — produção
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    # O environment "production" exige aprovação manual (configurado no GitHub).
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/helm-deploy
+        with:
+          environment: production
+          tag: ${{ env.TAG }}
+          registry: ${{ env.REGISTRY }}
+          role-arn: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          region: ${{ vars.AWS_REGION }}
+          cluster: ${{ vars.EKS_CLUSTER_NAME }}

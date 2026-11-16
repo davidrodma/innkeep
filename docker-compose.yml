@@ -1,0 +1,345 @@
+# =============================================================================
+# InnKeep — ambiente de desenvolvimento local completo
+#
+#   docker compose up -d --build        sobe tudo (infra + serviços + site)
+#   docker compose --profile observability up -d    acrescenta traces/métricas
+#   docker compose run --rm seed        carrega dados de demonstração
+#   docker compose logs -f reservation  acompanha os logs de um serviço
+#   docker compose down                 para tudo (os dados ficam nos volumes)
+#   docker compose down -v              para tudo E apaga os dados
+#
+# Endereços (todos em localhost):
+#   Site e painel ............. http://localhost:3000
+#   API (gateway) ............. http://localhost:8080
+#   E-mails capturados ........ http://localhost:8025   (Mailpit)
+#   Tópicos do Kafka .......... http://localhost:8085   (Kafka UI)
+#   Simulador de OTA .......... http://localhost:8090
+#   Traces (perfil extra) ..... http://localhost:16686  (Jaeger)
+#   Métricas (perfil extra) ... http://localhost:3001   (Grafana)
+#
+# As portas são publicadas apenas em 127.0.0.1: nada fica exposto na rede.
+# =============================================================================
+
+name: innkeep
+
+# ---- Blocos reutilizáveis (âncoras YAML) ------------------------------------
+x-go-service: &go-service
+  restart: unless-stopped
+  # A imagem final é distroless (sem shell), então o próprio binário faz a
+  # verificação de saúde: `/app healthcheck`.
+  healthcheck:
+    test: ["CMD", "/app", "healthcheck"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
+  # Contêiner endurecido: sistema de arquivos somente-leitura, sem privilégios
+  # extras. As mesmas restrições valem em produção (securityContext do Helm).
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+x-go-build: &go-build
+  context: .
+  dockerfile: deploy/docker/go-service.Dockerfile
+
+x-common-env: &common-env
+  APP_ENV: ${APP_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
+  HTTP_ADDR: ":8080"
+  KAFKA_BROKERS: kafka:9092
+  REDIS_URL: redis://redis:6379/0
+  AUTH_JWKS_URL: http://identity:8080/.well-known/jwks.json
+  # Vazio = telemetria desligada. O perfil "observability" liga (veja o fim).
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+
+x-depends-infra: &depends-infra
+  postgres: { condition: service_healthy }
+  kafka: { condition: service_healthy }
+  redis: { condition: service_healthy }
+
+services:
+  # ===========================================================================
+  # Infraestrutura
+  # ===========================================================================
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev}
+      POSTGRES_SERVICE_PASSWORD: ${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}
+    volumes:
+      # PostgreSQL 18: o volume é montado em /var/lib/postgresql (não em
+      # /var/lib/postgresql/data, como nas versões anteriores).
+      - postgres-data:/var/lib/postgresql
+      - ./deploy/docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      # Só fica saudável depois que o último banco (channel) foi criado.
+      test: ["CMD-SHELL", "psql -U postgres -d channel -c 'SELECT 1' > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    # Sem persistência em disco: aqui o Redis guarda só cache, contadores e
+    # chaves de idempotência — tudo descartável. "allkeys-lru" descarta as
+    # chaves menos usadas quando a memória enche.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:4.1.0
+    restart: unless-stopped
+    environment:
+      # Modo KRaft: o próprio Kafka faz o papel de controlador (não existe
+      # mais ZooKeeper). Aqui um único nó acumula os papéis de broker e
+      # controller; em produção (Amazon MSK) são 3 brokers.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Dois "listeners": INTERNAL para os contêineres (kafka:9092) e
+      # EXTERNAL para ferramentas na sua máquina (localhost:29092).
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # Com um único broker, o fator de replicação só pode ser 1.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Tópicos são criados explicitamente pelos serviços, nunca por acidente.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      # Retenção: os eventos ficam 7 dias no log, mesmo depois de consumidos.
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    ports: ["127.0.0.1:29092:29092"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  # Servidor SMTP de mentira: captura os e-mails e mostra em uma página web.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports: ["127.0.0.1:8025:8025"]
+
+  # Interface web para inspecionar tópicos, mensagens e grupos consumidores.
+  kafka-ui:
+    image: kafbat/kafka-ui:latest
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: innkeep-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "false"
+    depends_on:
+      kafka: { condition: service_healthy }
+    ports: ["127.0.0.1:8085:8080"]
+
+  # ===========================================================================
+  # Microserviços
+  # ===========================================================================
+  identity:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/identity/cmd/identity } }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://identity:${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}@postgres:5432/identity?sslmode=disable
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@innkeep.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-innkeep-dev-admin}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  property:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/property/cmd/property } }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://property:${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}@postgres:5432/property?sslmode=disable
+    depends_on: *depends-infra
+
+  inventory:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/inventory/cmd/inventory } }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://inventory:${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}@postgres:5432/inventory?sslmode=disable
+    depends_on: *depends-infra
+
+  reservation:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/reservation/cmd/reservation } }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://reservation:${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}@postgres:5432/reservation?sslmode=disable
+    depends_on: *depends-infra
+
+  billing:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/billing/cmd/billing } }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://billing:${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}@postgres:5432/billing?sslmode=disable
+    depends_on: *depends-infra
+
+  guest:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/guest/cmd/guest } }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://guest:${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}@postgres:5432/guest?sslmode=disable
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:-}
+    depends_on: *depends-infra
+
+  channel:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/channel/cmd/channel } }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgres://channel:${POSTGRES_SERVICE_PASSWORD:-innkeep_dev}@postgres:5432/channel?sslmode=disable
+      CHANNEL_ENCRYPTION_KEY: ${CHANNEL_ENCRYPTION_KEY:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080}
+      # Só em desenvolvimento: o simulador de OTA fica na rede interna do Docker.
+      CHANNEL_ALLOW_PRIVATE_URLS: "true"
+      CHANNEL_API_PULL_INTERVAL: 20s
+      CHANNEL_ICAL_PULL_INTERVAL: 1m
+    depends_on: *depends-infra
+
+  notification:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/notification/cmd/notification } }
+    environment:
+      <<: *common-env
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_TLS: none
+      MAIL_FROM: "InnKeep <reservas@innkeep.local>"
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+    depends_on:
+      kafka: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  gateway:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: services/gateway/cmd/gateway } }
+    environment:
+      <<: *common-env
+      IDENTITY_URL: http://identity:8080
+      PROPERTY_URL: http://property:8080
+      INVENTORY_URL: http://inventory:8080
+      RESERVATION_URL: http://reservation:8080
+      GUEST_URL: http://guest:8080
+      BILLING_URL: http://billing:8080
+      CHANNEL_URL: http://channel:8080
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      # Limite de tentativas de login por IP/minuto (os testes E2E elevam).
+      RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-20}
+    depends_on:
+      redis: { condition: service_healthy }
+      identity: { condition: service_healthy }
+    ports: ["127.0.0.1:8080:8080"]
+
+  # ===========================================================================
+  # Front-end
+  # ===========================================================================
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # O servidor do Next.js fala com a API pela rede interna do Docker.
+      API_URL: http://gateway:8080
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      NODE_ENV: production
+    depends_on:
+      gateway: { condition: service_healthy }
+    ports: ["127.0.0.1:3000:3000"]
+
+  # ===========================================================================
+  # Ferramentas de desenvolvimento
+  # ===========================================================================
+  # Faz o papel da Booking.com/Airbnb (veja tools/otasim).
+  otasim:
+    <<: *go-service
+    build: { <<: *go-build, args: { TARGET: tools/otasim } }
+    environment:
+      HTTP_ADDR: ":8090"
+    ports: ["127.0.0.1:8090:8090"]
+
+  # Carga de dados de demonstração. Não sobe com o `up`: rode sob demanda com
+  # `docker compose run --rm seed`.
+  seed:
+    build: { <<: *go-build, args: { TARGET: tools/seed } }
+    profiles: [tools]
+    environment:
+      API_URL: http://gateway:8080
+      OTASIM_URL: http://otasim:8090
+      ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@innkeep.local}
+      ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-innkeep-dev-admin}
+    depends_on:
+      gateway: { condition: service_healthy }
+
+  # ===========================================================================
+  # Observabilidade (perfil opcional)
+  #
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 \
+  #     docker compose --profile observability up -d
+  #
+  # Fluxo: serviços --OTLP--> Collector --+--> Jaeger      (traces)
+  #                                       +--> Prometheus  (métricas) --> Grafana
+  # ===========================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    profiles: [observability]
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./deploy/docker/otel/collector.yaml:/etc/otelcol/config.yaml:ro
+
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    profiles: [observability]
+    restart: unless-stopped
+    ports: ["127.0.0.1:16686:16686"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: [observability]
+    restart: unless-stopped
+    volumes:
+      - ./deploy/docker/otel/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin_dev}
+    volumes:
+      - ./deploy/docker/otel/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+    ports: ["127.0.0.1:3001:3000"]
+
+volumes:
+  postgres-data:
+  kafka-data:
