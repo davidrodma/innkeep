@@ -1,3 +1,4 @@
+import { BedDouble, LogIn, LogOut, Percent } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -37,11 +38,17 @@ export default async function DashboardPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Chegadas hoje" value={String(arrivalsPending.length)} hint={`${dashboard.arrivals.length} previstas`} />
-        <Stat label="Saídas hoje" value={String(departuresPending.length)} hint={`${dashboard.departures.length} previstas`} />
-        <Stat label="Hospedados agora" value={String(dashboard.in_house.length)} />
-        <Stat label="Ocupação hoje" value={`${occupancy}%`} hint={`${totalRooms - freeRooms} de ${totalRooms} quartos`} />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Stat label="Chegadas hoje" value={String(arrivalsPending.length)} hint={`${dashboard.arrivals.length} previstas`} icon={LogIn} />
+        <Stat label="Saídas hoje" value={String(departuresPending.length)} hint={`${dashboard.departures.length} previstas`} icon={LogOut} />
+        <Stat label="Hospedados agora" value={String(dashboard.in_house.length)} icon={BedDouble} tone="good" />
+        <Stat
+          label="Ocupação hoje"
+          value={`${occupancy}%`}
+          hint={`${totalRooms - freeRooms} de ${totalRooms} quartos`}
+          icon={Percent}
+          progress={occupancy}
+        />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -81,10 +88,10 @@ function ReservationList({
             <li key={reservation.id}>
               <Link
                 href={`/admin/reservations/${reservation.id}`}
-                className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-ink-50"
+                className="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-ink-50"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink-900">{reservation.holder.name}</p>
+                  <p className="truncate text-sm font-bold text-ink-900">{reservation.holder.name}</p>
                   <p className="text-xs text-ink-500">
                     {reservation.room_name ? `Quarto ${reservation.room_name}` : "Sem quarto"} ·{" "}
                     {formatDate(reservation.check_in)} a {formatDate(reservation.check_out)} ·{" "}

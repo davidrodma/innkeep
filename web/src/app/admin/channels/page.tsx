@@ -51,7 +51,7 @@ export default async function ChannelsPage() {
                 Último envio: {connection.last_push_at ? formatDateTime(connection.last_push_at) : "nunca"} · Última consulta de reservas:{" "}
                 {connection.last_pull_at ? formatDateTime(connection.last_pull_at) : "nunca"}
               </p>
-              {connection.last_error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{connection.last_error}</p> : null}
+              {connection.last_error ? <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-ink">{connection.last_error}</p> : null}
 
               <div>
                 <h3 className="mb-2 text-sm font-semibold text-ink-900">Tipos de acomodação mapeados</h3>
@@ -68,7 +68,7 @@ export default async function ChannelsPage() {
                           </span>
                           <form action={deleteMapping}>
                             <input type="hidden" name="id" value={mapping.id} />
-                            <button type="submit" className="text-xs text-ink-500 hover:text-red-700">
+                            <button type="submit" className="text-xs text-ink-500 hover:text-danger-ink">
                               Remover
                             </button>
                           </form>
@@ -95,7 +95,7 @@ export default async function ChannelsPage() {
                   <summary className="cursor-pointer text-sm font-medium text-ink-700">Histórico de sincronização</summary>
                   <ul className="mt-2 space-y-1 text-xs">
                     {logs.map((log) => (
-                      <li key={log.id} className={log.success ? "text-ink-600" : "text-red-700"}>
+                      <li key={log.id} className={log.success ? "text-ink-600" : "text-danger-ink"}>
                         {formatDateTime(log.created_at)} · {log.direction === "OUTBOUND" ? "enviado" : "recebido"} · {log.operation} · {log.detail}
                       </li>
                     ))}
@@ -109,7 +109,7 @@ export default async function ChannelsPage() {
                   <EditConnectionForm connection={connection} />
                   <form action={deleteConnection}>
                     <input type="hidden" name="id" value={connection.id} />
-                    <button type="submit" className="text-sm text-red-700 hover:underline">
+                    <button type="submit" className="text-sm text-danger-ink hover:underline">
                       Excluir conexão
                     </button>
                   </form>

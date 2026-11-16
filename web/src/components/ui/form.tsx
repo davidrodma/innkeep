@@ -8,11 +8,11 @@ import type { ActionState } from "@/lib/action";
 import { Button } from "./button";
 
 const CONTROL =
-  "block w-full rounded-lg border bg-white px-3 text-sm text-ink-900 placeholder:text-ink-400 " +
-  "disabled:bg-ink-100 disabled:text-ink-500";
+  "block w-full rounded-md border bg-white px-3 text-sm font-semibold text-ink-900 placeholder:font-normal placeholder:text-ink-400 " +
+  "transition-colors focus:border-brand-500 disabled:bg-ink-100 disabled:text-ink-500";
 
 function border(error?: string) {
-  return error ? "border-red-400" : "border-ink-300";
+  return error ? "border-danger bg-danger-soft/40" : "border-ink-200";
 }
 
 type FieldProps = {
@@ -29,12 +29,12 @@ type FieldProps = {
 export function Field({ label, name, hint, error, children, className = "" }: FieldProps) {
   return (
     <div className={className}>
-      <label htmlFor={name} className="mb-1 block text-sm font-medium text-ink-700">
+      <label htmlFor={name} className="mb-1.5 block text-sm font-semibold text-ink-700">
         {label}
       </label>
       {children}
       {error ? (
-        <p id={`${name}-error`} className="mt-1 text-xs text-red-600">
+        <p id={`${name}-error`} className="mt-1 text-xs font-semibold text-danger-ink">
           {error}
         </p>
       ) : hint ? (
@@ -115,8 +115,8 @@ export function FormMessage({ state }: { state: ActionState }) {
   return (
     <p
       role={state.ok ? "status" : "alert"}
-      className={`rounded-lg px-3 py-2 text-sm ${
-        state.ok ? "bg-brand-50 text-brand-800" : "bg-red-50 text-red-700"
+      className={`rounded-md px-3 py-2 text-sm font-semibold ${
+        state.ok ? "bg-success-soft text-success-ink" : "bg-danger-soft text-danger-ink"
       }`}
     >
       {state.message}

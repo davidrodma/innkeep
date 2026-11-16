@@ -54,8 +54,8 @@ export default async function FinanceSummaryPage({ searchParams }: Props) {
             {report.daily.map((day) => (
               <div key={day.date} className="group relative flex flex-1 flex-col items-center gap-1">
                 <div className="flex h-32 w-full items-end justify-center gap-px">
-                  <div className="w-1/2 rounded-t bg-brand-500" style={{ height: `${(day.gross_cents / maxDaily) * 100}%` }} />
-                  <div className="w-1/2 rounded-t bg-red-400" style={{ height: `${(day.expenses_cents / maxDaily) * 100}%` }} />
+                  <div className="w-1/2 rounded-t bg-success" style={{ height: `${(day.gross_cents / maxDaily) * 100}%` }} />
+                  <div className="w-1/2 rounded-t bg-danger/70" style={{ height: `${(day.expenses_cents / maxDaily) * 100}%` }} />
                 </div>
                 <span className="text-[10px] text-ink-500">{formatDayMonth(day.date).slice(0, 2)}</span>
                 <span className="pointer-events-none absolute bottom-full z-10 mb-1 hidden rounded bg-ink-900 px-2 py-1 text-xs whitespace-nowrap text-white group-hover:block">

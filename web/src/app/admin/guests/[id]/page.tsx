@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { buttonClass } from "@/components/ui/button";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Table, Td, Th } from "@/components/ui/layout";
 import { anonymizeGuest } from "@/features/guests/actions";
 import { ApiError, api } from "@/lib/api";
@@ -65,10 +66,10 @@ export default async function GuestPage({ params }: Props) {
             </p>
             {!guest.anonymized ? (
               <details>
-                <summary className="cursor-pointer font-medium text-red-700">Anonimizar hóspede</summary>
+                <summary className="cursor-pointer font-medium text-danger-ink">Anonimizar hóspede</summary>
                 <form action={anonymizeGuest} className="mt-3">
                   <input type="hidden" name="id" value={guest.id} />
-                  <button type="submit" className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
+                  <button type="submit" className={buttonClass("danger")}>
                     Confirmar anonimização
                   </button>
                 </form>

@@ -165,7 +165,7 @@ export function VoidEntryForm({ folioId, reservationId, entryId }: { folioId: st
   const [state, action] = useActionState(voidEntry, initialState);
   return (
     <details className="relative">
-      <summary className="cursor-pointer text-xs text-ink-500 hover:text-red-700">Anular</summary>
+      <summary className="cursor-pointer text-xs text-ink-500 hover:text-danger-ink">Anular</summary>
       <form action={action} className="absolute right-0 z-20 mt-1 w-64 space-y-2 rounded-lg border border-ink-200 bg-white p-3 shadow-lg">
         <input type="hidden" name="folio_id" value={folioId} />
         <input type="hidden" name="reservation_id" value={reservationId} />

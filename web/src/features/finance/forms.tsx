@@ -77,7 +77,7 @@ export function PayExpenseForm({ id, today }: { id: string; today: string }) {
       <SubmitButton size="sm" variant="secondary" pendingText="…">
         Pagar
       </SubmitButton>
-      {state.ok === false ? <span className="text-xs text-red-600">{state.message}</span> : null}
+      {state.ok === false ? <span className="text-xs text-danger-ink">{state.message}</span> : null}
     </form>
   );
 }

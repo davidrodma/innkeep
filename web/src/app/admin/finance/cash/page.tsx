@@ -73,7 +73,7 @@ export default async function CashPage({ searchParams }: Props) {
                     <Badge tone={movement.kind === "IN" ? "brand" : "red"}>{ORIGIN[movement.ref_type] ?? movement.ref_type}</Badge>
                   </Td>
                   <Td>{movement.reason}</Td>
-                  <Td align="right" className={movement.kind === "IN" ? "text-brand-700" : "text-red-700"}>
+                  <Td align="right" className={movement.kind === "IN" ? "text-brand-700" : "text-danger-ink"}>
                     {movement.kind === "IN" ? "+ " : "− "}
                     {formatMoney(movement.amount_cents)}
                   </Td>

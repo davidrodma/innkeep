@@ -75,14 +75,14 @@ export default async function RatesPage({ searchParams }: Props) {
                     <td
                       key={day.date}
                       title={`${formatDate(day.date)}: ${day.available} de ${day.total} livre(s)${day.closed ? " · vendas fechadas" : ""}${day.min_stay > 1 ? ` · mínimo ${day.min_stay} noites` : ""}`}
-                      className={`px-1 py-2 ${day.closed ? "bg-red-50" : isWeekend(day.date) ? "bg-ink-50" : ""}`}
+                      className={`px-1 py-2 ${day.closed ? "bg-danger-soft" : isWeekend(day.date) ? "bg-ink-50" : ""}`}
                     >
-                      <div className={`tabular font-semibold ${day.available === 0 ? "text-red-600" : "text-ink-900"}`}>
+                      <div className={`tabular font-semibold ${day.available === 0 ? "text-danger-ink" : "text-ink-900"}`}>
                         {day.available}/{day.total}
                       </div>
                       <div className="tabular text-ink-600">{formatMoney(day.price_cents).replace("R$", "").trim()}</div>
-                      {day.min_stay > 1 ? <div className="text-[10px] text-amber-700">mín {day.min_stay}</div> : null}
-                      {day.closed ? <div className="text-[10px] font-semibold text-red-700">fechado</div> : null}
+                      {day.min_stay > 1 ? <div className="text-[10px] text-warning-ink">mín {day.min_stay}</div> : null}
+                      {day.closed ? <div className="text-[10px] font-semibold text-danger-ink">fechado</div> : null}
                     </td>
                   ))}
                 </tr>
@@ -114,7 +114,7 @@ export default async function RatesPage({ searchParams }: Props) {
                       </span>
                       <form action={deleteBlock}>
                         <input type="hidden" name="id" value={block.id} />
-                        <button type="submit" className="text-xs text-ink-500 hover:text-red-700">
+                        <button type="submit" className="text-xs text-ink-500 hover:text-danger-ink">
                           Remover bloqueio
                         </button>
                       </form>

@@ -69,7 +69,7 @@ export function ReservationActions({ reservation, rooms }: { reservation: Reserv
       </div>
 
       {status === "CONFIRMED" && !reservation.registration_completed ? (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning-ink">
           Preencha a ficha de registro do hóspede (FNRH), abaixo, para liberar o check-in.
         </p>
       ) : null}
@@ -122,7 +122,7 @@ function CancelForm({ id }: { id: string }) {
   const [state, action] = useActionState(cancelReservation, initialState);
   return (
     <details className="rounded-lg border border-ink-200">
-      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-red-700">Cancelar reserva</summary>
+      <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-danger-ink">Cancelar reserva</summary>
       <form action={action} className="space-y-3 border-t border-ink-200 p-4">
         <input type="hidden" name="id" value={id} />
         <Field label="Motivo do cancelamento" name="reason">

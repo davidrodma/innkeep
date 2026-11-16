@@ -54,3 +54,64 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Cores de situação (sucesso, alerta, perigo, informação, destaque), usadas em
+   etiquetas e indicadores. Cada uma tem três tons: o principal, um mais escuro
+   para TEXTO (garante contraste AA sobre o fundo claro) e um fundo suave. */
+@theme {
+  --color-success: #00ab55;
+  --color-success-ink: #00763b;
+  --color-success-soft: #ddf5ea;
+  --color-warning: #e2a03f;
+  --color-warning-ink: #8f5d0e;
+  --color-warning-soft: #fff4e0;
+  --color-danger: #e7515a;
+  --color-danger-ink: #b8232d;
+  --color-danger-soft: #fdecee;
+  --color-info: #2196f3;
+  --color-info-ink: #0b62a8;
+  --color-info-soft: #e3f2fd;
+  --color-accent: #805dca;
+  --color-accent-ink: #5d3aa5;
+  --color-accent-soft: #efe9fa;
+}
+
+/*
+ * Tema do painel administrativo.
+ *
+ * Por que funciona: no Tailwind 4 cada utilitário lê a cor por variável CSS
+ * (bg-brand-600 vira `background: var(--color-brand-600)`). Redefinindo as
+ * variáveis dentro de `.admin-theme`, TODO o painel muda de paleta sem tocar nas
+ * classes das telas, e o site público continua com a identidade verde-azulada.
+ *
+ * Paleta: azul-anil como cor de ação e neutros frios (cinza-azulado), com fundo
+ * quase branco e cartões brancos com sombra suave em vez de bordas.
+ */
+.admin-theme {
+  --color-brand-50: #eef1fd;
+  --color-brand-100: #e0e6fc;
+  --color-brand-200: #c5d0fa;
+  --color-brand-300: #9eb0f6;
+  --color-brand-400: #7089f2;
+  --color-brand-500: #556ff0;
+  --color-brand-600: #4361ee;
+  --color-brand-700: #344fd6;
+  --color-brand-800: #2c41ad;
+  --color-brand-900: #283a87;
+
+  --color-ink-50: #f6f8fb;
+  --color-ink-100: #eef1f6;
+  --color-ink-200: #e0e6ed;
+  --color-ink-300: #c9d1dd;
+  --color-ink-400: #9aa3b8;
+  --color-ink-500: #67708a; /* mínimo para texto secundário com contraste AA */
+  --color-ink-600: #506690;
+  --color-ink-700: #3b3f5c;
+  --color-ink-800: #1f2737;
+  --color-ink-900: #0e1726;
+
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--color-ink-50);
+  color: var(--color-ink-900);
+}

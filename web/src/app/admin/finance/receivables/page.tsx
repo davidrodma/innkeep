@@ -48,7 +48,7 @@ export default async function ReceivablesPage() {
                 <Td>{label(SOURCE_LABELS, folio.source)}</Td>
                 <Td align="right">{formatMoney(folio.total_due_cents)}</Td>
                 <Td align="right">{formatMoney(folio.paid_cents)}</Td>
-                <Td align="right" className="font-semibold text-amber-700">
+                <Td align="right" className="font-semibold text-warning-ink">
                   {formatMoney(folio.balance_cents)}
                 </Td>
               </tr>

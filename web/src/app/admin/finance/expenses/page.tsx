@@ -74,7 +74,7 @@ export default async function ExpensesPage({ searchParams }: Props) {
                         <PayExpenseForm id={expense.id} today={currentDay} />
                         <form action={deleteExpense}>
                           <input type="hidden" name="id" value={expense.id} />
-                          <button type="submit" className="text-xs text-ink-500 hover:text-red-700">
+                          <button type="submit" className="text-xs text-ink-500 hover:text-danger-ink">
                             Excluir
                           </button>
                         </form>

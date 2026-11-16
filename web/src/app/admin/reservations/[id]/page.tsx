@@ -285,7 +285,7 @@ function Notice({ tone, children }: { tone: "neutral" | "red"; children: React.R
   return (
     <p
       role="status"
-      className={`mb-6 rounded-lg px-4 py-3 text-sm ${tone === "red" ? "bg-red-50 text-red-800" : "bg-ink-100 text-ink-700"}`}
+      className={`mb-6 rounded-lg px-4 py-3 text-sm ${tone === "red" ? "bg-danger-soft text-danger-ink" : "bg-ink-100 text-ink-700"}`}
     >
       {children}
     </p>

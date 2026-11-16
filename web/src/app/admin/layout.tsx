@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 
-import { Sidebar } from "@/components/admin/sidebar";
+import { AdminShell } from "@/components/admin/admin-shell";
+import { nunito } from "@/lib/fonts";
+import { ROLE_LABELS } from "@/lib/labels";
 import { availableProperties, currentUser } from "@/lib/session";
 import { PROPERTY_COOKIE } from "@/lib/session-cookies";
-import { cookies } from "next/headers";
 
 export const metadata: Metadata = { title: { default: "Painel", template: "%s · InnKeep" } };
 
@@ -14,16 +16,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const current = properties.find((property) => property.id === selected) ?? properties[0];
 
   return (
-    <div className="md:flex">
-      <Sidebar
+    // A classe da fonte define a variável --font-nunito, lida pelo tema do painel.
+    <div className={nunito.variable}>
+      <AdminShell
         userName={user.name}
+        roleLabel={ROLE_LABELS[user.role] ?? user.role}
         permissions={user.permissions}
         properties={properties.map((property) => ({ id: property.id, name: property.name }))}
         currentPropertyId={current?.id ?? ""}
-      />
-      <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
-        <div className="mx-auto max-w-6xl">{children}</div>
-      </main>
+      >
+        {children}
+      </AdminShell>
     </div>
   );
 }
