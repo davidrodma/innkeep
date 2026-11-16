@@ -58,7 +58,7 @@ jobs:
           - { name: notification, target: services/notification/cmd/notification }
           - { name: web, target: "" }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -99,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/helm-deploy
         with:
           environment: staging
@@ -116,7 +116,7 @@ jobs:
     # O environment "production" exige aprovação manual (configurado no GitHub).
     environment: production
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/helm-deploy
         with:
           environment: production
