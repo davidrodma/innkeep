@@ -205,7 +205,8 @@ curl -s https://api.<domínio>/healthz                  # {"status":"ok"}
 kubectl logs -n innkeep-staging deploy/innkeep-identity | grep "administrador inicial"
 ```
 
-1. Entre no painel com o e-mail do bootstrap e a senha guardada no segredo; **troque a senha**.
+1. Entre no painel em `https://<seu domínio>/login` com o e-mail do bootstrap e a senha guardada no
+   segredo (chave `BOOTSTRAP_ADMIN_PASSWORD`); **troque a senha** em *Equipe e conta*.
 2. Cadastre a propriedade, os tipos de acomodação e os quartos; marque "Publicar no site".
 3. Faça uma reserva pelo site e confirme que o e-mail chega.
 4. Conecte o canal (iCal ou API) e confira o histórico de sincronização na tela de canais.

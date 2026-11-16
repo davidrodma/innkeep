@@ -6,7 +6,7 @@ Tudo roda em contêineres Docker. Você **não** precisa instalar Go, Node, Post
 
 | Sistema | O que instalar |
 |---|---|
-| Windows | **WSL 2** com uma distribuição Linux (Ubuntu) e o Docker Engine dentro dela — ou o Docker Desktop com integração WSL. Rode os comandos no terminal do Linux, de preferência com o projeto clonado no sistema de arquivos do Linux (`~/innkeep`): é bem mais rápido do que em `/mnt/c`. |
+| Windows | **WSL 2** com uma distribuição Linux (Ubuntu) e o Docker Engine dentro dela — ou o Docker Desktop com integração WSL. Rode os comandos no terminal do Linux, de preferência com o projeto clonado no sistema de arquivos do Linux (`~/innkeep`): é bem mais rápido do que em `/mnt/c`. As pastas do Windows aparecem no Linux sob `/mnt/` (ex.: `C:\projetos\innkeep` é `/mnt/c/projetos/innkeep`). |
 | macOS | Docker Desktop (ou OrbStack/Colima). |
 | Linux | Docker Engine + plugin Docker Compose. |
 
@@ -24,6 +24,11 @@ cd innkeep
 cp .env.example .env
 docker compose up -d --build
 ```
+
+Daqui em diante, os comandos rodam na **raiz do repositório**: a pasta `innkeep` em que o `cd` acima
+entrou, onde fica o `docker-compose.yml`. Os que precisam de outra pasta trazem o próprio `cd` (como
+`cd web`). O motivo é que o `docker compose` procura o `docker-compose.yml` na pasta atual e, se não
+achar, nas pastas acima dela. Fora do projeto, ele responde `no configuration file provided: not found`.
 
 A primeira vez leva alguns minutos (download das imagens e compilação). Acompanhe com:
 
@@ -141,6 +146,7 @@ limpo, veja a próxima seção.
 
 | Sintoma | Causa provável e solução |
 |---|---|
+| `no configuration file provided: not found` | O terminal está fora da pasta do projeto. Entre na raiz do repositório (onde fica o `docker-compose.yml`) e repita o comando. |
 | Um serviço fica `unhealthy` | `docker compose logs <serviço>`. Na primeira subida o Kafka pode demorar; `docker compose up -d` de novo resolve. |
 | `port is already allocated` | Outra aplicação usa a porta. Troque o mapeamento no `docker-compose.yml`. |
 | Tudo lento no Windows | Clone o projeto dentro do Linux do WSL (`~/innkeep`), não em `/mnt/c`. Aumente a memória do WSL em `%UserProfile%\.wslconfig`. |
